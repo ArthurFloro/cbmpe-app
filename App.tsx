@@ -1,16 +1,39 @@
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Routes from './src/routes';
-import { Provider as PaperProvider } from 'react-native-paper';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { PaperProvider, MD3LightTheme } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Vamos criar essa tela de teste em breve
+import TestScreen from './src/screens/TestScreen';
+
+const Stack = createStackNavigator();
+
+// Tema personalizado (Opcional - Cores do CBMPE)
+const theme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: '#B22222', // Vermelho Bombeiro
+    secondary: '#DAA520', // Dourado/Caqui
+  },
+};
 
 export default function App() {
   return (
-    <PaperProvider>
-      <SafeAreaView style={{flex: 1}}>
-        <Routes/>
-      </SafeAreaView>
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <NavigationContainer>
+          <Stack.Navigator>
+            <Stack.Screen 
+              name="TesteLogica" 
+              component={TestScreen} 
+              options={{ title: 'Teste de Sensores' }} 
+            />
+            {/* Futuramente adicionaremos as telas de Formulario aqui */}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
-
-
