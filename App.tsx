@@ -5,7 +5,6 @@ import { PaperProvider, MD3LightTheme } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { OcorrenciaFormScreen } from "./src/screens/OcoorenciaFormScreen";
 import { OcorrenciaListScreen } from "./src/screens/OcorrenciaListScreen";
-
 const Stack = createStackNavigator();
 
 // Tema personalizado (Opcional - Cores do CBMPE)

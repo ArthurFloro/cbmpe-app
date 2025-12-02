@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { View, FlatList, StyleSheet, RefreshControl } from "react-native";
 import {
   Card,
@@ -9,14 +9,14 @@ import {
   useTheme,
 } from "react-native-paper";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { api } from "../services/api";
+import { api, BASE_URL } from "../services/api"; // <--- IMPORTAR BASE_URL
 
-// Definição rápida do tipo (pode importar do backend se preferir)
 interface Ocorrencia {
   _id: string;
   tipoFormulario: string;
   nomeEvento: string;
   numeroAviso: string;
+  foto?: string; // <--- Adicionar tipagem da foto
   createdAt: string;
 }
 
@@ -38,46 +38,65 @@ export function OcorrenciaListScreen() {
     }
   };
 
-  // Recarrega a lista toda vez que a tela ganha foco (ex: voltou da edição)
   useFocusEffect(
     useCallback(() => {
       fetchOcorrencias();
     }, [])
   );
 
-  const renderItem = ({ item }: { item: Ocorrencia }) => (
-    <Card
-      style={styles.card}
-      onPress={() => navigation.navigate("Formulario", { ocorrencia: item })} // Passa os dados para edição
-    >
-      <Card.Title
-        title={item.nomeEvento}
-        subtitle={`Aviso: ${item.numeroAviso}`}
-        right={(props) => (
-          <Chip
-            style={{
-              marginRight: 16,
-              backgroundColor:
-                item.tipoFormulario === "PREVENCAO" ? "#e8f5e9" : "#fff3e0",
-            }}
-          >
-            {item.tipoFormulario === "PREVENCAO" ? "Prev" : "Com"}
-          </Chip>
+  const renderItem = ({ item }: { item: Ocorrencia }) => {
+    // Tratamento da URL da Imagem
+    let imageUrl = null;
+    if (item.foto) {
+      // Corrige barras invertidas (Windows) para barras normais
+      const cleanPath = item.foto.replace(/\\/g, "/");
+      imageUrl = `${BASE_URL}/${cleanPath}`;
+    }
+
+    return (
+      <Card
+        style={styles.card}
+        onPress={() => navigation.navigate("Formulario", { ocorrencia: item })}
+        mode="elevated"
+      >
+        {/* FOTO DO CARD */}
+        {imageUrl && (
+          <Card.Cover source={{ uri: imageUrl }} style={styles.cardImage} />
         )}
-      />
-      <Card.Content>
-        <Text variant="bodySmall" style={{ color: "#666" }}>
-          Data: {new Date(item.createdAt).toLocaleDateString("pt-BR")}
-        </Text>
-      </Card.Content>
-    </Card>
-  );
+
+        <Card.Title
+          title={item.nomeEvento}
+          titleStyle={{ fontWeight: "bold" }}
+          subtitle={`Aviso: ${item.numeroAviso}`}
+          right={(props) => (
+            <View style={{ marginRight: 16 }}>
+              <Chip
+                compact
+                style={{
+                  backgroundColor:
+                    item.tipoFormulario === "PREVENCAO" ? "#e8f5e9" : "#fff3e0",
+                }}
+                textStyle={{ fontSize: 10, color: "#333" }}
+              >
+                {item.tipoFormulario === "PREVENCAO" ? "PREV" : "COM"}
+              </Chip>
+            </View>
+          )}
+        />
+        <Card.Content>
+          <Text variant="bodySmall" style={{ color: "#666" }}>
+            Data: {new Date(item.createdAt).toLocaleDateString("pt-BR")}
+          </Text>
+        </Card.Content>
+      </Card>
+    );
+  };
 
   return (
     <View style={styles.container}>
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -94,12 +113,11 @@ export function OcorrenciaListScreen() {
         />
       )}
 
-      {/* Botão Flutuante para Adicionar Nova */}
       <FAB
         icon="plus"
         style={[styles.fab, { backgroundColor: theme.colors.primary }]}
         color="white"
-        onPress={() => navigation.navigate("Formulario", { ocorrencia: null })} // Passa null para indicar criação
+        onPress={() => navigation.navigate("Formulario", { ocorrencia: null })}
       />
     </View>
   );
@@ -107,7 +125,8 @@ export function OcorrenciaListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5", padding: 10 },
-  card: { marginBottom: 10, backgroundColor: "white" },
+  card: { marginBottom: 16, backgroundColor: "white", overflow: "hidden" }, // overflow hidden para arredondar a imagem
+  cardImage: { height: 150 }, // Altura fixa para a lista ficar uniforme
   fab: { position: "absolute", margin: 16, right: 0, bottom: 0 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { textAlign: "center", marginTop: 50, color: "#888" },
