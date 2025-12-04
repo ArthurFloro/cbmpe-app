@@ -3,17 +3,18 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { PaperProvider, MD3LightTheme } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { OcorrenciaFormScreen } from "./src/screens/OcoorenciaFormScreen";
 import { OcorrenciaListScreen } from "./src/screens/OcorrenciaListScreen";
+import { InitialScreen } from "./src/screens/InitialScreen";
+import { StatusBar } from "react-native";
+import { OcorrenciaFormScreen } from "./src/screens/OcoorenciaFormScreen";
 const Stack = createStackNavigator();
 
-// Tema personalizado (Opcional - Cores do CBMPE)
 const theme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: "#B22222", // Vermelho Bombeiro
-    secondary: "#DAA520", // Dourado/Caqui
+    primary: "#B22222",
+    secondary: "#DAA520",
   },
 };
 
@@ -21,8 +22,14 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
+        <StatusBar barStyle="default" />
         <NavigationContainer>
           <Stack.Navigator>
+            <Stack.Screen
+              name="InitialScreen"
+              component={InitialScreen}
+              options={{ headerShown: false }}
+            />
             <Stack.Screen
               name="ListaOcorrencias"
               component={OcorrenciaListScreen}

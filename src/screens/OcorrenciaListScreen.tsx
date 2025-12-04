@@ -9,14 +9,14 @@ import {
   useTheme,
 } from "react-native-paper";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { api, BASE_URL } from "../services/api"; // <--- IMPORTAR BASE_URL
+import { api, BASE_URL } from "../services/api"; // 
 
 interface Ocorrencia {
   _id: string;
   tipoFormulario: string;
   nomeEvento: string;
   numeroAviso: string;
-  foto?: string; // <--- Adicionar tipagem da foto
+  foto?: string; 
   createdAt: string;
 }
 
@@ -45,10 +45,8 @@ export function OcorrenciaListScreen() {
   );
 
   const renderItem = ({ item }: { item: Ocorrencia }) => {
-    // Tratamento da URL da Imagem
     let imageUrl = null;
     if (item.foto) {
-      // Corrige barras invertidas (Windows) para barras normais
       const cleanPath = item.foto.replace(/\\/g, "/");
       imageUrl = `${BASE_URL}/${cleanPath}`;
     }
@@ -59,7 +57,6 @@ export function OcorrenciaListScreen() {
         onPress={() => navigation.navigate("Formulario", { ocorrencia: item })}
         mode="elevated"
       >
-        {/* FOTO DO CARD */}
         {imageUrl && (
           <Card.Cover source={{ uri: imageUrl }} style={styles.cardImage} />
         )}
@@ -125,8 +122,8 @@ export function OcorrenciaListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5", padding: 10 },
-  card: { marginBottom: 16, backgroundColor: "white", overflow: "hidden" }, // overflow hidden para arredondar a imagem
-  cardImage: { height: 150 }, // Altura fixa para a lista ficar uniforme
+  card: { marginBottom: 16, backgroundColor: "white", overflow: "hidden" }, 
+  cardImage: { height: 150 }, 
   fab: { position: "absolute", margin: 16, right: 0, bottom: 0 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyText: { textAlign: "center", marginTop: 50, color: "#888" },

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   ScrollView,
@@ -14,28 +14,30 @@ import {
   SegmentedButtons,
   Text,
   Card,
-  HelperText,
-  useTheme,
 } from "react-native-paper";
 import MapView, { Marker } from "react-native-maps";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useOcorrenciaMedia } from "../hooks/useOcorrenciaMedia";
-import { api } from "../services/api";
+import { api, BASE_URL } from "../services/api";
 
 export function OcorrenciaFormScreen() {
   const navigation = useNavigation();
+  const route = useRoute<any>();
+
+  const ocorrenciaEditar = route.params?.ocorrencia;
+
   const {
     location,
     photoUri,
     getLocation,
     takePhoto,
+    setPhotoUri,
     loading: loadingMedia,
   } = useOcorrenciaMedia();
 
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [tipoFormulario, setTipoFormulario] = useState("PREVENCAO");
 
-  // Estado único para todos os campos
   const [formData, setFormData] = useState({
     numeroAviso: "",
     nomeEvento: "",
@@ -49,27 +51,84 @@ export function OcorrenciaFormScreen() {
     viaturasEmpregadas: "",
     responsavelGuarnicao: "",
     informacoesAdicionais: "",
-    // Campos Específicos
-    arAvcb: "", // Prevenção
-    prevencaoAquatica: "", // Prevenção
-    periodo: "", // Atividade Comunitária
-    tipoInteracao: "", // Atividade Comunitária
+    arAvcb: "",
+    prevencaoAquatica: "",
+    periodo: "",
+    tipoInteracao: "",
   });
+
+  useEffect(() => {
+    if (ocorrenciaEditar) {
+      navigation.setOptions({ title: "Editar Ocorrência" });
+
+      setTipoFormulario(ocorrenciaEditar.tipoFormulario);
+      setFormData({
+        numeroAviso: ocorrenciaEditar.numeroAviso || "",
+        nomeEvento: ocorrenciaEditar.nomeEvento || "",
+        codigoCGO: ocorrenciaEditar.codigoCGO || "",
+        dataChegada: ocorrenciaEditar.dataChegada || "",
+        dataInicio: ocorrenciaEditar.dataInicio || "",
+        dataSaida: ocorrenciaEditar.dataSaida || "",
+        publicoEstimado: String(ocorrenciaEditar.publico?.estimado || ""),
+        publicoPresente: String(ocorrenciaEditar.publico?.presente || ""),
+        servicosRealizados: ocorrenciaEditar.servicosRealizados || "",
+        viaturasEmpregadas: ocorrenciaEditar.viaturasEmpregadas || "",
+        responsavelGuarnicao: ocorrenciaEditar.responsavelGuarnicao || "",
+        informacoesAdicionais: ocorrenciaEditar.informacoesAdicionais || "",
+        arAvcb: ocorrenciaEditar.responsavelEvento?.arAvcb || "",
+        prevencaoAquatica: ocorrenciaEditar.prevencaoAquatica || "",
+        periodo: ocorrenciaEditar.periodo || "",
+        tipoInteracao: ocorrenciaEditar.tipoInteracao || "",
+      });
+
+      if (ocorrenciaEditar.foto) {
+        const cleanPath = ocorrenciaEditar.foto.replace(/\\/g, "/");
+        setPhotoUri(`${BASE_URL}/${cleanPath}`);
+      }
+    }
+  }, [ocorrenciaEditar]);
 
   const handleChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleDelete = async () => {
+    Alert.alert(
+      "Excluir Ocorrência",
+      "Tem certeza que deseja excluir este registro? Essa ação não pode ser desfeita.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoadingSubmit(true);
+              await api.delete(`/ocorrencias/${ocorrenciaEditar._id}`);
+              Alert.alert("Sucesso", "Ocorrência excluída.");
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert("Erro", "Não foi possível excluir.");
+            } finally {
+              setLoadingSubmit(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmit = async () => {
-    // 1. Validação Básica
-    if (!location || !photoUri) {
-      Alert.alert("Atenção", "Localização e Foto são obrigatórios!");
+    // Validação básica
+    if (!formData.numeroAviso || !formData.nomeEvento) {
+      Alert.alert("Atenção", "Campos Aviso e Evento são obrigatórios.");
       return;
     }
-    if (!formData.numeroAviso || !formData.nomeEvento) {
+
+    if (!ocorrenciaEditar && (!location || !photoUri)) {
       Alert.alert(
         "Atenção",
-        "Preencha os campos obrigatórios (Aviso, Evento)."
+        "Para novas ocorrências, GPS e Foto são obrigatórios."
       );
       return;
     }
@@ -77,46 +136,77 @@ export function OcorrenciaFormScreen() {
     setLoadingSubmit(true);
 
     try {
-      // 2. Montando o FormData (Necessário para envio de arquivo)
       const data = new FormData();
 
-      // Campos de Texto
       data.append("tipoFormulario", tipoFormulario);
-      Object.keys(formData).forEach((key) => {
-        // @ts-ignore
-        data.append(key, formData[key]);
+
+      Object.entries(formData).forEach(([key, value]) => {
+        data.append(key, value ? String(value) : "");
       });
 
-      // Campos Aninhados (Backend espera publico[estimado])
-      data.append("publico[estimado]", formData.publicoEstimado);
-      data.append("publico[presente]", formData.publicoPresente);
+      data.append(
+        "publico[estimado]",
+        formData.publicoEstimado ? String(formData.publicoEstimado) : "0"
+      );
+      data.append(
+        "publico[presente]",
+        formData.publicoPresente ? String(formData.publicoPresente) : "0"
+      );
 
-      // Geolocalização
-      data.append("latitude", String(location.coords.latitude));
-      data.append("longitude", String(location.coords.longitude));
+      if (location) {
+        data.append("latitude", String(location.coords.latitude));
+        data.append("longitude", String(location.coords.longitude));
+      }
 
-      // Foto (Sintaxe específica do React Native)
-      const filename = photoUri.split("/").pop();
-      const match = /\.(\w+)$/.exec(filename || "");
-      const type = match ? `image/${match[1]}` : `image`;
+      if (photoUri && !photoUri.startsWith("http")) {
+        const filename = photoUri.split("/").pop() || `foto-${Date.now()}.jpg`;
 
-      data.append("foto", {
-        uri: photoUri,
-        name: filename || "foto.jpg",
-        type,
-      } as any);
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
 
-      // 3. Envio para API
-      await api.post("/ocorrencias", data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+        const uriClean =
+          Platform.OS === "ios" ? photoUri.replace("file://", "") : photoUri;
 
-      Alert.alert("Sucesso", "Ocorrência registrada com sucesso!", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Erro", "Falha ao enviar ocorrência. Verifique sua conexão.");
+        data.append("foto", {
+          uri: uriClean,
+          name: filename,
+          type: type,
+        } as any);
+      }
+
+      console.log("Enviando...", JSON.stringify(formData));
+
+      if (ocorrenciaEditar) {
+        await api.put(`/ocorrencias/${ocorrenciaEditar._id}`, data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        Alert.alert("Sucesso", "Dados atualizados!");
+      } else {
+        await api.post("/ocorrencias", data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        Alert.alert("Sucesso", "Ocorrência registrada!");
+      }
+
+      navigation.goBack();
+    } catch (error: any) {
+      console.error("Erro detalhado:", error);
+
+      if (error.response) {
+        Alert.alert(
+          "Erro do Servidor",
+          `Status: ${error.response.status}\n${JSON.stringify(
+            error.response.data
+          )}`
+        );
+      } else if (error.request) {
+        Alert.alert(
+          "Erro de Conexão",
+          "O servidor não respondeu. Verifique o IP."
+        );
+      } else {
+        Alert.alert("Erro Interno", error.message);
+      }
     } finally {
       setLoadingSubmit(false);
     }
@@ -128,7 +218,6 @@ export function OcorrenciaFormScreen() {
       style={{ flex: 1 }}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Seletor de Tipo de Formulário */}
         <SegmentedButtons
           value={tipoFormulario}
           onValueChange={setTipoFormulario}
@@ -171,7 +260,6 @@ export function OcorrenciaFormScreen() {
           </Card.Content>
         </Card>
 
-        {/* Campos Dinâmicos baseados na seleção */}
         {tipoFormulario === "PREVENCAO" ? (
           <Card style={[styles.card, { borderColor: "green", borderWidth: 1 }]}>
             <Card.Title title="Dados de Prevenção" />
@@ -257,14 +345,12 @@ export function OcorrenciaFormScreen() {
               label="Serviços Realizados"
               mode="outlined"
               multiline
-              numberOfLines={3}
               style={styles.input}
               value={formData.servicosRealizados}
               onChangeText={(t) => handleChange("servicosRealizados", t)}
             />
-
             <TextInput
-              label="Viaturas / Efetivo"
+              label="Viaturas"
               mode="outlined"
               style={styles.input}
               value={formData.viaturasEmpregadas}
@@ -281,74 +367,54 @@ export function OcorrenciaFormScreen() {
           </Card.Content>
         </Card>
 
-        {/* Mídia e Sensores */}
         <Card style={styles.card}>
-          <Card.Title title="Evidências" />
+          <Card.Title title="Evidências" subtitle="Localização e Foto" />
           <Card.Content>
-            <View style={styles.row}>
-              <Button
-                mode={location ? "contained-tonal" : "contained"}
-                onPress={getLocation}
-                loading={loadingMedia}
-                icon="map-marker"
-                style={{ flex: 1, marginRight: 8 }}
-              >
-                {location ? "Atualizar GPS" : "Pegar GPS"}
-              </Button>
-
-              <Button
-                mode={photoUri ? "contained-tonal" : "contained"}
-                onPress={takePhoto}
-                icon="camera"
-                style={{ flex: 1 }}
-              >
-                {photoUri ? "Trocar Foto" : "Tirar Foto"}
-              </Button>
-            </View>
-
-            {location && (
-              <View style={styles.mediaContainer}>
-                {/* Mapa Visual */}
-                <View style={styles.mapContainer}>
-                  {location ? (
-                    <MapView
-                      style={styles.map}
-                      region={{
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                        latitudeDelta: 0.005,
-                        longitudeDelta: 0.005,
-                      }}
-                      scrollEnabled={false} // Trava o scroll para não brigar com a tela
-                    >
-                      <Marker
-                        coordinate={location.coords}
-                        title="Local da Ocorrência"
-                      />
-                    </MapView>
-                  ) : (
-                    <View style={styles.placeholderMap}>
-                      <Text style={{ color: "#888" }}>
-                        Mapa indisponível. Capture o GPS.
-                      </Text>
-                    </View>
-                  )}
-                  <Button
-                    mode="contained"
-                    onPress={getLocation}
-                    loading={loadingMedia}
-                    icon="map-marker"
-                    style={styles.mapButton}
-                  >
-                    {location ? "Atualizar Posição" : "Capturar GPS"}
-                  </Button>
+            <View style={styles.mapContainer}>
+              {location ? (
+                <MapView
+                  style={styles.map}
+                  region={{
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    latitudeDelta: 0.005,
+                    longitudeDelta: 0.005,
+                  }}
+                  scrollEnabled={false}
+                >
+                  <Marker coordinate={location.coords} title="Local" />
+                </MapView>
+              ) : (
+                <View style={styles.placeholderMap}>
+                  <Text style={{ color: "#888" }}>
+                    {ocorrenciaEditar
+                      ? "GPS salvo no banco. Clique para atualizar."
+                      : "Mapa indisponível. Capture o GPS."}
+                  </Text>
                 </View>
-              </View>
-            )}
+              )}
+            </View>
+            <Button
+              mode="outlined"
+              onPress={getLocation}
+              loading={loadingMedia}
+              icon="map-marker"
+              style={{ marginBottom: 10 }}
+            >
+              {location ? "Atualizar Localização" : "Capturar Localização"}
+            </Button>
 
             {photoUri && (
               <Image source={{ uri: photoUri }} style={styles.previewImage} />
             )}
+            <Button
+              mode="contained"
+              onPress={takePhoto}
+              icon="camera"
+              style={{ marginTop: 10 }}
+            >
+              {photoUri ? "Alterar Foto" : "Tirar Foto"}
+            </Button>
           </Card.Content>
         </Card>
 
@@ -359,8 +425,20 @@ export function OcorrenciaFormScreen() {
           style={styles.submitButton}
           contentStyle={{ height: 50 }}
         >
-          ENVIAR OCORRÊNCIA
+          {ocorrenciaEditar ? "SALVAR ALTERAÇÕES" : "ENVIAR OCORRÊNCIA"}
         </Button>
+
+        {ocorrenciaEditar && (
+          <Button
+            mode="outlined"
+            onPress={handleDelete}
+            textColor="red"
+            style={{ marginTop: 16, borderColor: "red" }}
+            icon="trash-can"
+          >
+            Excluir Ocorrência
+          </Button>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
